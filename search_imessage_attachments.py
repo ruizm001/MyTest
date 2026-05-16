@@ -78,7 +78,12 @@ def build_query(args):
         sql += " AND LOWER(a.transfer_name) LIKE ?"
         params.append(f"%{args.filename.lower()}%")
 
-    sql += " ORDER BY m.date DESC"
+    order = "ASC" if getattr(args, "sort", "desc") == "asc" else "DESC"
+    sql += f" ORDER BY m.date {order}"
+
+    if getattr(args, "limit", None):
+        sql += f" LIMIT {int(args.limit)}"
+
     return sql, params
 
 
@@ -125,6 +130,18 @@ def main():
         "--missing",
         action="store_true",
         help="Also show attachments whose files no longer exist on disk",
+    )
+    parser.add_argument(
+        "--sort",
+        choices=["asc", "desc"],
+        default="desc",
+        help="Sort by date: asc (oldest first) or desc (newest first, default)",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        metavar="N",
+        help="Show only the first N results",
     )
     parser.add_argument(
         "--paths-only",
