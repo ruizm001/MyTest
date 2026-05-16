@@ -13,17 +13,22 @@ APPLE_EPOCH_OFFSET = 978307200
 
 
 def apple_time_to_unix(apple_ts):
-    """Convert Apple absolute time (nanoseconds) to a Unix timestamp."""
-    # Newer macOS stores timestamps in nanoseconds
     if apple_ts > 1e12:
         apple_ts /= 1e9
     return apple_ts + APPLE_EPOCH_OFFSET
 
 
 def parse_date(date_str):
-    """Parse a date string (YYYY-MM-DD) into a Unix timestamp."""
     dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     return dt.timestamp()
+
+
+def format_apple_date(date_raw):
+    try:
+        unix_ts = apple_time_to_unix(date_raw)
+        return datetime.fromtimestamp(unix_ts).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return "unknown"
 
 
 def build_query(args):
@@ -33,6 +38,7 @@ def build_query(args):
             a.mime_type,
             a.transfer_name,
             m.date,
+            m.is_from_me,
             h.id AS contact
         FROM attachment a
         JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID
@@ -43,16 +49,13 @@ def build_query(args):
     params = []
 
     if args.type:
-        placeholders = ",".join("?" * len(args.type))
+        MIME_CATEGORIES = {"image", "video", "audio", "application", "text"}
         type_conditions = []
         for t in args.type:
-            MIME_CATEGORIES = {"image", "video", "audio", "application", "text"}
             if t.lower() in MIME_CATEGORIES or "/" in t:
-                # treat as MIME type prefix (e.g. "image", "video", "image/jpeg")
                 type_conditions.append("a.mime_type LIKE ?")
                 params.append(f"{t}%")
             else:
-                # treat as file extension (e.g. "pdf", "jpg")
                 type_conditions.append("LOWER(a.filename) LIKE ?")
                 params.append(f"%.{t.lstrip('.').lower()}")
         sql += f" AND ({' OR '.join(type_conditions)})"
@@ -80,7 +83,6 @@ def build_query(args):
 
 
 def resolve_path(filename):
-    """Expand the ~ in iMessage attachment paths to the actual home directory."""
     return os.path.expanduser(filename)
 
 
@@ -102,12 +104,12 @@ def main():
     parser.add_argument(
         "--after",
         metavar="YYYY-MM-DD",
-        help="Only include attachments from messages sent on or after this date",
+        help="Only include attachments on or after this date",
     )
     parser.add_argument(
         "--before",
         metavar="YYYY-MM-DD",
-        help="Only include attachments from messages sent on or before this date",
+        help="Only include attachments on or before this date",
     )
     parser.add_argument(
         "--contact",
@@ -123,6 +125,11 @@ def main():
         "--missing",
         action="store_true",
         help="Also show attachments whose files no longer exist on disk",
+    )
+    parser.add_argument(
+        "--paths-only",
+        action="store_true",
+        help="Print only file paths, one per line (useful for piping)",
     )
     args = parser.parse_args()
 
@@ -147,14 +154,29 @@ def main():
         conn.close()
 
     found = 0
-    for filename, mime_type, transfer_name, date_raw, contact in rows:
+    for filename, mime_type, transfer_name, date_raw, is_from_me, contact in rows:
         path = resolve_path(filename)
         if not args.missing and not os.path.exists(path):
             continue
-        print(path)
+
+        if args.paths_only:
+            print(path)
+        else:
+            date_str = format_apple_date(date_raw)
+            other = contact or "unknown"
+            from_label = "Me" if is_from_me else other
+            to_label = other if is_from_me else "Me"
+            print(f"Date:  {date_str}")
+            print(f"From:  {from_label}")
+            print(f"To:    {to_label}")
+            print(f"File:  {transfer_name or os.path.basename(path)}")
+            print(f"Type:  {mime_type or 'unknown'}")
+            print(f"Path:  {path}")
+            print()
+
         found += 1
 
-    print(f"\n{found} attachment(s) found.", file=sys.stderr)
+    print(f"{found} attachment(s) found.", file=sys.stderr)
 
 
 if __name__ == "__main__":
