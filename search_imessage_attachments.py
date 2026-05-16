@@ -46,12 +46,13 @@ def build_query(args):
         placeholders = ",".join("?" * len(args.type))
         type_conditions = []
         for t in args.type:
-            if "/" in t:
-                # treat as MIME type prefix (e.g. "image", "video")
+            MIME_CATEGORIES = {"image", "video", "audio", "application", "text"}
+            if t.lower() in MIME_CATEGORIES or "/" in t:
+                # treat as MIME type prefix (e.g. "image", "video", "image/jpeg")
                 type_conditions.append("a.mime_type LIKE ?")
                 params.append(f"{t}%")
             else:
-                # treat as file extension
+                # treat as file extension (e.g. "pdf", "jpg")
                 type_conditions.append("LOWER(a.filename) LIKE ?")
                 params.append(f"%.{t.lstrip('.').lower()}")
         sql += f" AND ({' OR '.join(type_conditions)})"
