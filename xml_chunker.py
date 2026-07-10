@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Split an XML file into smaller chunk files, or count its elements."""
+"""Split an XML file into ~100 MB chunk files, or count its elements."""
 
 import argparse
+import io
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -19,7 +20,13 @@ def count_elements(input_file: str) -> dict:
     }
 
 
-def chunk_xml(input_file: str, chunk_size: int, output_dir: str) -> list[str]:
+def element_bytes(element: ET.Element) -> int:
+    buf = io.StringIO()
+    ET.ElementTree(element).write(buf, encoding="unicode")
+    return len(buf.getvalue().encode("utf-8"))
+
+
+def chunk_xml(input_file: str, max_bytes: int, output_dir: str) -> list[str]:
     tree = ET.parse(input_file)
     root = tree.getroot()
     children = list(root)
@@ -30,32 +37,55 @@ def chunk_xml(input_file: str, chunk_size: int, output_dir: str) -> list[str]:
 
     os.makedirs(output_dir, exist_ok=True)
     output_files = []
+    stem = Path(input_file).stem
     chunk_num = 1
+    batch = []
+    batch_bytes = 0
 
-    for i in range(0, len(children), chunk_size):
-        batch = children[i : i + chunk_size]
-
-        # Build a new root with the same tag and attributes
+    def write_chunk(batch, chunk_num):
         new_root = ET.Element(root.tag, root.attrib)
         for child in batch:
             new_root.append(child)
-
         tree_out = ET.ElementTree(new_root)
         ET.indent(tree_out, space="  ")
-
-        stem = Path(input_file).stem
         out_path = os.path.join(output_dir, f"{stem}_chunk_{chunk_num:03d}.xml")
         tree_out.write(out_path, encoding="unicode", xml_declaration=True)
-        output_files.append(out_path)
-        print(f"  Wrote {len(batch)} element(s) -> {out_path}")
-        chunk_num += 1
+        size_mb = os.path.getsize(out_path) / (1024 * 1024)
+        print(f"  Wrote {len(batch)} element(s) ({size_mb:.1f} MB) -> {out_path}")
+        return out_path
+
+    for child in children:
+        child_size = element_bytes(child)
+
+        if batch and batch_bytes + child_size > max_bytes:
+            output_files.append(write_chunk(batch, chunk_num))
+            chunk_num += 1
+            batch = []
+            batch_bytes = 0
+
+        batch.append(child)
+        batch_bytes += child_size
+
+    if batch:
+        output_files.append(write_chunk(batch, chunk_num))
 
     return output_files
 
 
+def parse_size(value: str) -> int:
+    value = value.strip().upper()
+    if value.endswith("GB"):
+        return int(float(value[:-2]) * 1024 ** 3)
+    if value.endswith("MB"):
+        return int(float(value[:-2]) * 1024 ** 2)
+    if value.endswith("KB"):
+        return int(float(value[:-2]) * 1024)
+    return int(value)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Break an XML file into smaller chunk files, or count its elements."
+        description="Break an XML file into chunk files by size, or count its elements."
     )
     parser.add_argument("input", help="Path to the input XML file")
     parser.add_argument(
@@ -64,11 +94,10 @@ def main():
         help="Print element counts and exit without chunking",
     )
     parser.add_argument(
-        "-n",
-        "--chunk-size",
-        type=int,
-        default=100,
-        help="Number of top-level child elements per chunk (default: 100)",
+        "-s",
+        "--max-size",
+        default="100MB",
+        help="Maximum size per chunk file, e.g. 100MB, 50MB, 1GB (default: 100MB)",
     )
     parser.add_argument(
         "-o",
@@ -90,9 +119,11 @@ def main():
         print(f"Total elements     : {counts['total']}")
         return
 
+    max_bytes = parse_size(args.max_size)
     print(f"Parsing {args.input} ...")
-    files = chunk_xml(args.input, args.chunk_size, args.output_dir)
-    print(f"\nDone — {len(files)} chunk(s) written to '{args.output_dir}/'")
+    print(f"Target chunk size  : {args.max_size} ({max_bytes:,} bytes)")
+    files = chunk_xml(args.input, max_bytes, args.output_dir)
+    print(f"\nDone -- {len(files)} chunk(s) written to '{args.output_dir}/'")
 
 
 if __name__ == "__main__":
