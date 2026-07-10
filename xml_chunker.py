@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
-"""Split an XML file into smaller chunk files based on top-level child elements."""
+"""Split an XML file into smaller chunk files, or count its elements."""
 
 import argparse
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+
+def count_elements(input_file: str) -> dict:
+    tree = ET.parse(input_file)
+    root = tree.getroot()
+    all_elements = list(root.iter())
+    top_level = list(root)
+    return {
+        "total": len(all_elements),
+        "top_level": len(top_level),
+        "root_tag": root.tag,
+    }
 
 
 def chunk_xml(input_file: str, chunk_size: int, output_dir: str) -> list[str]:
@@ -43,9 +55,14 @@ def chunk_xml(input_file: str, chunk_size: int, output_dir: str) -> list[str]:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Break an XML file into smaller chunk files."
+        description="Break an XML file into smaller chunk files, or count its elements."
     )
     parser.add_argument("input", help="Path to the input XML file")
+    parser.add_argument(
+        "--count",
+        action="store_true",
+        help="Print element counts and exit without chunking",
+    )
     parser.add_argument(
         "-n",
         "--chunk-size",
@@ -63,6 +80,14 @@ def main():
 
     if not os.path.isfile(args.input):
         print(f"Error: file not found: {args.input}")
+        return
+
+    if args.count:
+        counts = count_elements(args.input)
+        print(f"File               : {args.input}")
+        print(f"Root element       : <{counts['root_tag']}>")
+        print(f"Top-level children : {counts['top_level']}")
+        print(f"Total elements     : {counts['total']}")
         return
 
     print(f"Parsing {args.input} ...")
