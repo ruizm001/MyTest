@@ -1,0 +1,43 @@
+<?xml version='1.0' encoding='utf-8'?>
+<catalog>
+  <item id="11">
+    <name>Item 11</name>
+    <price>16.5</price>
+  </item>
+  <item id="12">
+    <name>Item 12</name>
+    <price>18.0</price>
+  </item>
+  <item id="13">
+    <name>Item 13</name>
+    <price>19.5</price>
+  </item>
+  <item id="14">
+    <name>Item 14</name>
+    <price>21.0</price>
+  </item>
+  <item id="15">
+    <name>Item 15</name>
+    <price>22.5</price>
+  </item>
+  <item id="16">
+    <name>Item 16</name>
+    <price>24.0</price>
+  </item>
+  <item id="17">
+    <name>Item 17</name>
+    <price>25.5</price>
+  </item>
+  <item id="18">
+    <name>Item 18</name>
+    <price>27.0</price>
+  </item>
+  <item id="19">
+    <name>Item 19</name>
+    <price>28.5</price>
+  </item>
+  <item id="20">
+    <name>Item 20</name>
+    <price>30.0</price>
+  </item>
+</catalog>

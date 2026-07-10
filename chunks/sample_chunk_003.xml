@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<catalog>
+  <item id="21">
+    <name>Item 21</name>
+    <price>31.5</price>
+  </item>
+  <item id="22">
+    <name>Item 22</name>
+    <price>33.0</price>
+  </item>
+  <item id="23">
+    <name>Item 23</name>
+    <price>34.5</price>
+  </item>
+  <item id="24">
+    <name>Item 24</name>
+    <price>36.0</price>
+  </item>
+  <item id="25">
+    <name>Item 25</name>
+    <price>37.5</price>
+  </item>
+</catalog>
